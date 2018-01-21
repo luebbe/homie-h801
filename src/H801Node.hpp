@@ -12,6 +12,8 @@
 #include <Homie.hpp>
 #include <ArduinoJson.h>
 
+#define DEBUG
+
 #define DIMMER_1_PIN_RED 15
 #define DIMMER_2_PIN_GREEN 13
 #define DIMMER_3_PIN_BLUE 12
@@ -24,8 +26,16 @@
 class H801Node : public HomieNode
 {
 private:
+  const int cFadeSteps = 400;
   const char *cCaption = "• H801 RGBWW Controller:";
   static const uint16_t /*PROGMEM*/ gamma8[];
+
+  enum ANIMATIONMODE
+  {
+    DONE = 0, // fading finished, nothing to do
+    STARTFADE,
+    DOFADE
+  };
 
   enum COLORINDEX // Enum for array indices
   {
@@ -37,18 +47,26 @@ private:
   };
 
   uint8_t _pins[5] = {DIMMER_1_PIN_RED, DIMMER_2_PIN_GREEN, DIMMER_3_PIN_BLUE, DIMMER_4_PIN_W1, DIMMER_5_PIN_W2};
-  uint8_t _curValue[5] = {0, 0, 0, 0, 0};
-  uint8_t _prevValue[5] = {0, 0, 0, 0, 0};
+  uint8_t _curValue[5] = {0, 0, 0, 0, 0}; // The current percent value of the dimmer
+  uint8_t _endValue[5] = {0, 0, 0, 0, 0}; // The target percent value of the dimmer
+  int8_t _step[5] = {0, 0, 0, 0, 0};
 
-  uint16_t _transitionTime = 0;
+  uint16_t _loopCount = 0;
+
+  unsigned long _lastLoop = 0;
+  unsigned long _transitionTime = 25; // one step each _transitionTime in milliseconds
+
+  ANIMATIONMODE _animationMode = DONE;
 
   void printCaption();
   int tryStrToInt(const String &value, const int maxvalue = 100);
 
-  void setLED(uint8_t ledPin, uint8_t value);
-  void setRGB(uint8_t R, uint8_t G, uint8_t B);
-  void setW1(uint8_t W1);
-  void setW2(uint8_t W2);
+  int calculateStep(int curValue, int endValue);
+  void calculateSteps();
+  int calculateVal(int step, int val, int i);
+  void crossFade();
+
+  void setColor();
 
 protected:
   virtual bool handleInput(const String &property, const HomieRange &range, const String &value) override;

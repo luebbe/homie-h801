@@ -48,23 +48,28 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
   }
   else if (property == "red")
   {
-    _curValue[COLORINDEX::RED] = tryStrToInt(value);
+    _endValue[COLORINDEX::RED] = tryStrToInt(value);
+    _animationMode = STARTFADE;
   }
   else if (property == "green")
   {
-    _curValue[COLORINDEX::GREEN] = tryStrToInt(value);
+    _endValue[COLORINDEX::GREEN] = tryStrToInt(value);
+    _animationMode = STARTFADE;
   }
   else if (property == "blue")
   {
-    _curValue[COLORINDEX::BLUE] = tryStrToInt(value);
+    _endValue[COLORINDEX::BLUE] = tryStrToInt(value);
+    _animationMode = STARTFADE;
   }
   else if (property == "white1")
   {
-    _curValue[COLORINDEX::WHITE1] = tryStrToInt(value);
+    _endValue[COLORINDEX::WHITE1] = tryStrToInt(value);
+    _animationMode = STARTFADE;
   }
   else if (property == "white2")
   {
-    _curValue[COLORINDEX::WHITE2] = tryStrToInt(value);
+    _endValue[COLORINDEX::WHITE2] = tryStrToInt(value);
+    _animationMode = STARTFADE;
   }
 
   return true;
@@ -75,36 +80,141 @@ void H801Node::printCaption()
   Homie.getLogger() << cCaption << endl;
 }
 
-void H801Node::setLED(uint8_t ledPin, uint8_t value)
+// From https://www.arduino.cc/en/Tutorial/ColorCrossfader
+/* BELOW THIS LINE IS THE MATH -- YOU SHOULDN'T NEED TO CHANGE THIS FOR THE BASICS
+*
+* The program works like this:
+* Imagine a crossfade that moves the red LED from 0-10,
+*   the green from 0-5, and the blue from 10 to 7, in
+*   ten steps.
+*   We'd want to count the 10 steps and increase or
+*   decrease color values in evenly stepped increments.
+*   Imagine a + indicates raising a value by 1, and a -
+*   equals lowering it. Our 10 step fade would look like:
+*
+*   1 2 3 4 5 6 7 8 9 10
+* R + + + + + + + + + +
+* G   +   +   +   +   +
+* B     -     -     -
+*
+* The red rises from 0 to 10 in ten steps, the green from
+* 0-5 in 5 steps, and the blue falls from 10 to 7 in three steps.
+*
+* In the real program, the color percentages are converted to
+* 0-255 values, and there are 1020 steps (255*4).
+*
+* To figure out how big a step there should be between one up- or
+* down-tick of one of the LED values, we call calculateStep(),
+* which calculates the absolute gap between the start and end values,
+* and then divides that gap by 1020 to determine the size of the step
+* between adjustments in the value.
+*/
+int H801Node::calculateStep(int curValue, int endValue)
 {
-  uint16_t gammaValue = gamma8[value];
-  analogWrite(ledPin, gammaValue);
+  int step = endValue - curValue; // What's the overall gap?
+  if (step)
+  {                    // If its non-zero,
+    step = cFadeSteps / step; //   divide by cFadeSteps
+  }
+
+  return step;
 }
 
-void H801Node::setRGB(uint8_t R, uint8_t G, uint8_t B)
+void H801Node::calculateSteps()
 {
-  setLED(_pins[COLORINDEX::RED], R);
-  setLED(_pins[COLORINDEX::GREEN], G);
-  setLED(_pins[COLORINDEX::BLUE], B);
+  for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+  {
+    _step[i] = calculateStep(_curValue[i], _endValue[i]);
+#ifdef DEBUG
+    Homie.getLogger() << "Step[" << i << "] c=" << _curValue[i] << " e=" << _endValue[i] << " s=" << _step[i] << endl;
+#endif
+  }
 }
 
-void H801Node::setW1(uint8_t W1)
+/* The next function is calculateVal. When the loop value, i,
+*  reaches the step size appropriate for one of the
+*  colors, it increases or decreases the value of that color by 1.
+*  (R, G, and B are each calculated separately.)
+*/
+int H801Node::calculateVal(int step, int val, int i)
 {
-  setLED(_pins[COLORINDEX::WHITE1], W1);
+  if ((step) && i % step == 0)
+  { // If step is non-zero and its time to change a value,
+    if (step > 0)
+    { //   increment the value if step is positive...
+      val += 1;
+    }
+    else if (step < 0)
+    { //   ...or decrement it if step is negative
+      val -= 1;
+    }
+  }
+
+  // Defensive driving: make sure val stays in the range 0-100
+  val = constrain(val, 0, 100);
+
+  return val;
 }
 
-void H801Node::setW2(uint8_t W2)
+void H801Node::crossFade()
 {
-  setLED(_pins[COLORINDEX::WHITE2], W2);
+  if (_loopCount < cFadeSteps)
+  {
+    for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+    {
+      _curValue[i] = calculateVal(_step[i], _curValue[i], _loopCount);
+    }
+
+    // Write current values to LED pins
+    setColor();
+
+#ifdef DEBUG
+    Homie.getLogger() << "Loop count: " << _loopCount;
+    for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+    {
+      Homie.getLogger() << " " << _curValue[i];
+    }
+    Homie.getLogger() << endl;
+#endif
+
+    _loopCount++;
+  }
+  else
+  {
+    _animationMode = DONE;
+    Homie.getLogger() << "DONE" << endl;
+  }
+}
+
+void H801Node::setColor()
+{
+  for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+  {
+    analogWrite(_pins[i], gamma8[_curValue[i]]);
+  }
 }
 
 void H801Node::loop()
 {
+  if (_animationMode == STARTFADE)
+  {
+    calculateSteps();
+    _loopCount = 0;
+    _animationMode = DOFADE;
+  };
+
+  if (_animationMode == DOFADE)
+  {
+    unsigned long now = millis();
+    if (now - _lastLoop > _transitionTime || _lastLoop == 0)
+    {
+      _lastLoop = now;
+      crossFade();
+    }
+  }
+
   if (_transitionTime == 0)
   {
-    setRGB(_curValue[COLORINDEX::RED], _curValue[COLORINDEX::GREEN], _curValue[COLORINDEX::BLUE]);
-    setW1(_curValue[COLORINDEX::WHITE1]);
-    setW2(_curValue[COLORINDEX::WHITE2]);
   }
   else
   {
