@@ -45,6 +45,7 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
   }
   else if (property == "speed")
   {
+    _transitionTime = tryStrToInt(value) * 1000 / cFadeSteps;
   }
   else if (property == "red")
   {
@@ -80,7 +81,74 @@ void H801Node::printCaption()
   Homie.getLogger() << cCaption << endl;
 }
 
+void H801Node::setColor()
+{
+  for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+  {
+    analogWrite(_pins[i], gamma8[_curValue[i]]);
+  }
+}
+
+void H801Node::loop()
+{
+  if (_animationMode == STARTFADE)
+  {
+    calculateSteps();
+    _loopCount = 0;
+    _animationMode = DOFADE;
+  };
+
+  if (_transitionTime == 0)
+  {
+    for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+    {
+      _curValue[i] = _endValue[i];
+      setColor();
+    }
+  }
+  else
+  {
+    if (_animationMode == DOFADE)
+    {
+      unsigned long now = millis();
+      if (now - _lastLoop > _transitionTime || _lastLoop == 0)
+      {
+        _lastLoop = now;
+        crossFade();
+      }
+    }
+  }
+}
+
+void H801Node::beforeSetup()
+{
+  advertise("command").settable(); // Parses a complete JSON command, so that every property can be set in one MQTT message
+  advertise("speed").settable();   // Transition speed for colors and effects
+  advertise("red").settable();     // RGB values from 0% to 100%
+  advertise("green").settable();   //
+  advertise("blue").settable();    //
+  // advertise("hue").settable();        // hue from 0° to 360°
+  // advertise("saturation").settable(); // from 0% to 100%
+  // advertise("value").settable();      // from 0% to 100%
+  advertise("white1").settable(); // White channels from 0% to 100%
+  advertise("white2").settable(); //
+  // advertise("effect").settable();     //
+}
+
+void H801Node::setupHandler()
+{
+  //  setProperty(cVoltageUnit).send("V");
+}
+
+void H801Node::setup()
+{
+  printCaption();
+}
+
 // From https://www.arduino.cc/en/Tutorial/ColorCrossfader
+//
+// Modified to work with percent values for each dimmer
+//
 /* BELOW THIS LINE IS THE MATH -- YOU SHOULDN'T NEED TO CHANGE THIS FOR THE BASICS
 *
 * The program works like this:
@@ -100,8 +168,7 @@ void H801Node::printCaption()
 * The red rises from 0 to 10 in ten steps, the green from
 * 0-5 in 5 steps, and the blue falls from 10 to 7 in three steps.
 *
-* In the real program, the color percentages are converted to
-* 0-255 values, and there are 1020 steps (255*4).
+* We are working with percent values and there are 400 steps (100*4).
 *
 * To figure out how big a step there should be between one up- or
 * down-tick of one of the LED values, we call calculateStep(),
@@ -113,7 +180,7 @@ int H801Node::calculateStep(int curValue, int endValue)
 {
   int step = endValue - curValue; // What's the overall gap?
   if (step)
-  {                    // If its non-zero,
+  {                           // If its non-zero,
     step = cFadeSteps / step; //   divide by cFadeSteps
   }
 
@@ -134,7 +201,7 @@ void H801Node::calculateSteps()
 /* The next function is calculateVal. When the loop value, i,
 *  reaches the step size appropriate for one of the
 *  colors, it increases or decreases the value of that color by 1.
-*  (R, G, and B are each calculated separately.)
+*  (each dimmer channel is calculated separately.)
 */
 int H801Node::calculateVal(int step, int val, int i)
 {
@@ -168,7 +235,7 @@ void H801Node::crossFade()
     // Write current values to LED pins
     setColor();
 
-#ifdef DEBUG
+#ifdef DEBUGFADE
     Homie.getLogger() << "Loop count: " << _loopCount;
     for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
     {
@@ -182,66 +249,8 @@ void H801Node::crossFade()
   else
   {
     _animationMode = DONE;
+#ifdef DEBUG
     Homie.getLogger() << "DONE" << endl;
+#endif
   }
-}
-
-void H801Node::setColor()
-{
-  for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
-  {
-    analogWrite(_pins[i], gamma8[_curValue[i]]);
-  }
-}
-
-void H801Node::loop()
-{
-  if (_animationMode == STARTFADE)
-  {
-    calculateSteps();
-    _loopCount = 0;
-    _animationMode = DOFADE;
-  };
-
-  if (_animationMode == DOFADE)
-  {
-    unsigned long now = millis();
-    if (now - _lastLoop > _transitionTime || _lastLoop == 0)
-    {
-      _lastLoop = now;
-      crossFade();
-    }
-  }
-
-  if (_transitionTime == 0)
-  {
-  }
-  else
-  {
-  }
-}
-
-void H801Node::beforeSetup()
-{
-  advertise("command").settable(); // Parses a complete JSON command, so that every property can be set in one MQTT message
-  advertise("speed").settable();   // Transition speed for colors and effects
-  advertise("red").settable();     // RGB values from 0% to 100%
-  advertise("green").settable();   //
-  advertise("blue").settable();    //
-  // advertise("hue").settable();        // hue from 0° to 360°
-  // advertise("saturation").settable(); // from 0% to 100%
-  // advertise("value").settable();      // from 0% to 100%
-  advertise("white1").settable(); // White channels from 0% to 100%
-  advertise("white2").settable(); //
-  // advertise("effect").settable();     //
-}
-
-void H801Node::setupHandler()
-{
-  //  setProperty(cVoltageUnit).send("V");
-}
-
-void H801Node::setup()
-{
-  printCaption();
 }

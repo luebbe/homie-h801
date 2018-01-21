@@ -13,6 +13,7 @@
 #include <ArduinoJson.h>
 
 #define DEBUG
+// #define DEBUGFADE
 
 #define DIMMER_1_PIN_RED 15
 #define DIMMER_2_PIN_GREEN 13
@@ -49,12 +50,12 @@ private:
   uint8_t _pins[5] = {DIMMER_1_PIN_RED, DIMMER_2_PIN_GREEN, DIMMER_3_PIN_BLUE, DIMMER_4_PIN_W1, DIMMER_5_PIN_W2};
   uint8_t _curValue[5] = {0, 0, 0, 0, 0}; // The current percent value of the dimmer
   uint8_t _endValue[5] = {0, 0, 0, 0, 0}; // The target percent value of the dimmer
-  int8_t _step[5] = {0, 0, 0, 0, 0};
+  int8_t _step[5] = {0, 0, 0, 0, 0};      // every _step milliseconds the corresponding dimmer value is incremented or decremented
 
   uint16_t _loopCount = 0;
 
   unsigned long _lastLoop = 0;
-  unsigned long _transitionTime = 25; // one step each _transitionTime in milliseconds
+  unsigned long _transitionTime = 0; // one step each _transitionTime in milliseconds
 
   ANIMATIONMODE _animationMode = DONE;
 
