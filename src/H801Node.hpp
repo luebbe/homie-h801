@@ -26,14 +26,22 @@ class H801Node : public HomieNode
 private:
   const char *cCaption = "• H801 RGBWW Controller:";
   static const uint16_t /*PROGMEM*/ gamma8[];
-  uint8_t _red = 0;
-  uint8_t _green = 0;
-  uint8_t _blue = 0;
-  uint8_t _white1 = 0;
-  uint8_t _white2 = 0;
+
+  enum COLORINDEX // Enum for array indices
+  {
+    RED = 0,
+    GREEN,
+    BLUE,
+    WHITE1,
+    WHITE2
+  };
+
+  uint8_t _pins[5] = {DIMMER_1_PIN_RED, DIMMER_2_PIN_GREEN, DIMMER_3_PIN_BLUE, DIMMER_4_PIN_W1, DIMMER_5_PIN_W2};
+  uint8_t _curValue[5] = {0, 0, 0, 0, 0};
+  uint8_t _prevValue[5] = {0, 0, 0, 0, 0};
+
   uint16_t _transitionTime = 0;
 
-  void initController();
   void printCaption();
   int tryStrToInt(const String &value, const int maxvalue = 100);
 

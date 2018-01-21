@@ -25,32 +25,16 @@ const uint16_t /*PROGMEM*/ H801Node::gamma8[] = {
 H801Node::H801Node(const char *name)
     : HomieNode(name, "RGBWW Controller")
 {
-}
-
-void H801Node::initController()
-{
-  pinMode(DIMMER_1_PIN_RED, OUTPUT);
-  pinMode(DIMMER_2_PIN_GREEN, OUTPUT);
-  pinMode(DIMMER_3_PIN_BLUE, OUTPUT);
-  pinMode(DIMMER_4_PIN_W1, OUTPUT);
-  pinMode(DIMMER_5_PIN_W2, OUTPUT);
-  setRGB(0, 0, 0);
-  setW1(0);
-  setW2(0);
+  for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+  {
+    pinMode(_pins[i], OUTPUT);
+    analogWrite(_pins[i], 0);
+  }
 }
 
 int H801Node::tryStrToInt(const String &value, const int maxvalue)
 {
-  int _value = value.toInt();
-  if (_value < 0)
-  {
-    _value = 0;
-  }
-  if (_value > maxvalue)
-  {
-    _value = maxvalue;
-  }
-  return _value;
+  return constrain(value.toInt(), 0, maxvalue);
 }
 
 bool H801Node::handleInput(const String &property, const HomieRange &range, const String &value)
@@ -64,23 +48,23 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
   }
   else if (property == "red")
   {
-    _red = tryStrToInt(value);
+    _curValue[COLORINDEX::RED] = tryStrToInt(value);
   }
   else if (property == "green")
   {
-    _green = tryStrToInt(value);
+    _curValue[COLORINDEX::GREEN] = tryStrToInt(value);
   }
   else if (property == "blue")
   {
-    _blue = tryStrToInt(value);
+    _curValue[COLORINDEX::BLUE] = tryStrToInt(value);
   }
   else if (property == "white1")
   {
-    _white1 = tryStrToInt(value);
+    _curValue[COLORINDEX::WHITE1] = tryStrToInt(value);
   }
   else if (property == "white2")
   {
-    _white2 = tryStrToInt(value);
+    _curValue[COLORINDEX::WHITE2] = tryStrToInt(value);
   }
 
   return true;
@@ -99,36 +83,36 @@ void H801Node::setLED(uint8_t ledPin, uint8_t value)
 
 void H801Node::setRGB(uint8_t R, uint8_t G, uint8_t B)
 {
-  setLED(DIMMER_1_PIN_RED, R);
-  setLED(DIMMER_2_PIN_GREEN, G);
-  setLED(DIMMER_3_PIN_BLUE, B);
+  setLED(_pins[COLORINDEX::RED], R);
+  setLED(_pins[COLORINDEX::GREEN], G);
+  setLED(_pins[COLORINDEX::BLUE], B);
 }
 
 void H801Node::setW1(uint8_t W1)
 {
-  setLED(DIMMER_4_PIN_W1, W1);
+  setLED(_pins[COLORINDEX::WHITE1], W1);
 }
 
 void H801Node::setW2(uint8_t W2)
 {
-  setLED(DIMMER_5_PIN_W2, W2);
+  setLED(_pins[COLORINDEX::WHITE2], W2);
 }
 
 void H801Node::loop()
 {
-  if(_transitionTime == 0) {
-    setRGB(_red, _green, _blue);
-    setW1(_white1);
-    setW2(_white2);
+  if (_transitionTime == 0)
+  {
+    setRGB(_curValue[COLORINDEX::RED], _curValue[COLORINDEX::GREEN], _curValue[COLORINDEX::BLUE]);
+    setW1(_curValue[COLORINDEX::WHITE1]);
+    setW2(_curValue[COLORINDEX::WHITE2]);
   }
-  else {
-
+  else
+  {
   }
 }
 
 void H801Node::beforeSetup()
 {
-  initController();
   advertise("command").settable(); // Parses a complete JSON command, so that every property can be set in one MQTT message
   advertise("speed").settable();   // Transition speed for colors and effects
   advertise("red").settable();     // RGB values from 0% to 100%
@@ -137,8 +121,8 @@ void H801Node::beforeSetup()
   // advertise("hue").settable();        // hue from 0° to 360°
   // advertise("saturation").settable(); // from 0% to 100%
   // advertise("value").settable();      // from 0% to 100%
-  advertise("white1").settable();     // White channels from 0% to 100%
-  advertise("white2").settable();     //
+  advertise("white1").settable(); // White channels from 0% to 100%
+  advertise("white2").settable(); //
   // advertise("effect").settable();     //
 }
 
