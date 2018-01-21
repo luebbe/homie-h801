@@ -34,6 +34,8 @@ void setup()
 
   welcome.show();
 
+  h801node.beforeSetup();
+
   Homie.setSetupFunction(setupHandler);
   Homie.setLoopFunction(loopHandler);
   Homie.setup();
