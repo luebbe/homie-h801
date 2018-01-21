@@ -32,6 +32,47 @@ H801Node::H801Node(const char *name)
   }
 }
 
+bool H801Node::parseJsonCommand(const String &payload)
+{
+  StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
+
+  JsonObject &root = jsonBuffer.parseObject(payload);
+
+#ifdef DEBUG
+  setProperty("message").send("JSON Processing");
+  setProperty("message").send(payload);
+#endif
+
+  if (!root.success())
+  {
+#ifdef DEBUG
+    Homie.getLogger() << "JSON Parsing failed" << endl;
+    setProperty("message").send("JSON Parsing failed");
+#endif
+    return false;
+  }
+
+  if (root.containsKey("color"))
+  {
+    JsonObject &color = root["color"];
+
+    for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+    {
+      if (color.containsKey(_jsonKey[i]))
+      {
+        _endValue[i] = color[_jsonKey[i]];
+      }
+    }
+  }
+
+  if (root.containsKey("speed"))
+  {
+    _transitionTime = root["speed"];
+  }
+
+  return true;
+}
+
 int H801Node::tryStrToInt(const String &value, const int maxvalue)
 {
   return constrain(value.toInt(), 0, maxvalue);
@@ -41,7 +82,10 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
 {
   if (property == "command")
   {
-    //parseJsonCommand(value);
+    if (parseJsonCommand(value))
+    {
+      _animationMode = STARTFADE;
+    }
   }
   else if (property == "speed")
   {
