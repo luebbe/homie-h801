@@ -1,0 +1,11 @@
+// Set RGB directly
+// RGB values are in the range 0%..100%
+
+{"color":{"r":20,"g":30,"b":60}}
+
+// Set HSV values
+// HSV values are in the range 0..255
+
+{"hsv":{"h":0,"s":255,"v":100}}
+{"hsv":{"h":0,"s":255,"v":255}}
+{"hsv":{"h":128,"s":255,"v":255}}

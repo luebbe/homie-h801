@@ -11,6 +11,7 @@
 
 #include <Homie.hpp>
 #include <ArduinoJson.h>
+#include "hsv2rgb.h"
 
 // #define DEBUG     // uncomment this line if you want to see the start and end values in fading
 // #define DEBUGFADE // uncomment this line if you want to see all the single steps in fading
@@ -65,8 +66,11 @@ private:
 
   void printCaption();
 
-  bool parseJsonCommand(const String &payload);
+  int toPercent(const int value);
   int tryStrToInt(const String &value, const int maxvalue = 100);
+
+  void jsonFeedback(const String &message);
+  bool parseJsonCommand(const String &payload);
 
   // Methods for calculating the fade steps and the fading itself
   int calculateStep(int curValue, int endValue);

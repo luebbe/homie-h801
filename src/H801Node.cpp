@@ -32,6 +32,12 @@ H801Node::H801Node(const char *name)
   }
 }
 
+void H801Node::jsonFeedback(const String &message)
+{
+  Homie.getLogger() << message << endl;
+  setProperty("message").send(message);
+}
+
 bool H801Node::parseJsonCommand(const String &payload)
 {
   StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
@@ -39,20 +45,22 @@ bool H801Node::parseJsonCommand(const String &payload)
   JsonObject &root = jsonBuffer.parseObject(payload);
 
 #ifdef DEBUG
-  setProperty("message").send("JSON Processing");
-  setProperty("message").send(payload);
+  jsonFeedback("JSON " + payload);
 #endif
 
   if (!root.success())
   {
 #ifdef DEBUG
-    Homie.getLogger() << "JSON Parsing failed" << endl;
-    setProperty("message").send("JSON Parsing failed");
+    jsonFeedback("JSON Parsing failed");
 #endif
     return false;
   }
 
-  if (root.containsKey("color"))
+  if (root.containsKey("color") && root.containsKey("hsv"))
+  {
+    jsonFeedback("JSON command may only contain either 'color' or 'hsv'");
+  }
+  else if (root.containsKey("color"))
   {
     JsonObject &color = root["color"];
 
@@ -60,9 +68,23 @@ bool H801Node::parseJsonCommand(const String &payload)
     {
       if (color.containsKey(_jsonKey[i]))
       {
-        _endValue[i] = color[_jsonKey[i]];
+        _endValue[i] = tryStrToInt(color[_jsonKey[i]]);
       }
     }
+    _animationMode = STARTFADE;
+  }
+  else if (root.containsKey("hsv"))
+  {
+    struct CHSV hsvIn;
+    struct CRGB rgbOut;
+    hsvIn.hue = root["hsv"]["h"];
+    hsvIn.sat = root["hsv"]["s"];
+    hsvIn.val = root["hsv"]["v"];
+    hsv2rgb_rainbow(hsvIn, rgbOut);
+    _endValue[COLORINDEX::RED] = toPercent(rgbOut.red);
+    _endValue[COLORINDEX::GREEN] = toPercent(rgbOut.green);
+    _endValue[COLORINDEX::BLUE] = toPercent(rgbOut.blue);
+    _animationMode = STARTFADE;
   }
 
   if (root.containsKey("speed"))
@@ -71,6 +93,12 @@ bool H801Node::parseJsonCommand(const String &payload)
   }
 
   return true;
+}
+
+int H801Node::toPercent(const int value)
+{
+  Homie.getLogger() << value << endl;
+  return value * 100 / 255;
 }
 
 int H801Node::tryStrToInt(const String &value, const int maxvalue)
@@ -84,7 +112,6 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
   {
     if (parseJsonCommand(value))
     {
-      _animationMode = STARTFADE;
     }
   }
   else if (property == "speed")

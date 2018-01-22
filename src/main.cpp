@@ -2,8 +2,7 @@
 #define FW_VERSION "1.0.0"
 
 #include <Homie.h>
-#include <ArduinoOTA.h>
-
+// #include <ArduinoOTA.h>
 #include "ota.hpp"
 #include "welcome.cpp"
 #include "H801Node.hpp"
@@ -16,11 +15,14 @@ H801Node h801node("h801");
 void setupHandler()
 {
   ota.setup();
+//  ArduinoOTA.setHostname(Homie.getConfiguration().deviceId);
+//  ArduinoOTA.begin();
 }
 
 void loopHandler()
 {
   ota.loop();
+//  ArduinoOTA.handle();
 }
 
 void setup()
