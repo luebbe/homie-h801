@@ -6,6 +6,6 @@
 // Set HSV values
 // HSV values are in the range 0..255
 
-{"hsv":{"h":0,"s":255,"v":100}}
-{"hsv":{"h":0,"s":255,"v":255}}
-{"hsv":{"h":128,"s":255,"v":255}}
+{"hsv":{"h":0,"s":255,"v":128}}   // red with 50% brightness
+{"hsv":{"h":0,"s":255,"v":255}}   // Full red
+{"hsv":{"h":128,"s":255,"v":255}} // Full green
