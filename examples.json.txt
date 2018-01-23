@@ -3,6 +3,11 @@
 
 {"color":{"r":20,"g":30,"b":60}}
 
+// You can also send white1/2 in the JSON command
+
+{"color":{"r":20,"g":30,"b":60,"w1":50,"w2":80}}
+
+
 // Set HSV values
 // HSV values are in the range 0..255
 

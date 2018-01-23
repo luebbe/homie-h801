@@ -32,17 +32,59 @@ H801Node::H801Node(const char *name)
   }
 }
 
+int H801Node::toByte(const int value, const int factor)
+{
+  return value * 255 / factor;
+}
+
+int H801Node::toPercent(const int value, const int factor)
+{
+  return value * factor / 255;
+}
+
+int H801Node::tryStrToInt(const String &value, const int maxvalue)
+{
+  return constrain(value.toInt(), 0, maxvalue);
+}
+
+void H801Node::fadeToHSV(int h, int s, int v)
+{
+  // The FastLED hsv<->rgb converter works with values from 0..255
+  // Input values from OpenHAB
+  // H = 0°..360°
+  // S = 0%..100%
+  // V = 0%..100%
+  // _endValue[s] are percent values again
+
+  struct CHSV hsvIn;
+  struct CRGB rgbOut;
+
+  // Convert to byte value range
+  hsvIn.hue = toByte(h, 360);
+  hsvIn.sat = toByte(s);
+  hsvIn.val = toByte(v);
+
+  // do the math
+  hsv2rgb_rainbow(hsvIn, rgbOut);
+
+  // convert back to percent values
+  _endValue[COLORINDEX::RED] = toPercent(rgbOut.red);
+  _endValue[COLORINDEX::GREEN] = toPercent(rgbOut.green);
+  _endValue[COLORINDEX::BLUE] = toPercent(rgbOut.blue);
+  _animationMode = STARTFADE;
+}
+
 void H801Node::jsonFeedback(const String &message)
 {
   Homie.getLogger() << message << endl;
   setProperty("message").send(message);
 }
 
-bool H801Node::parseJsonCommand(const String &payload)
+bool H801Node::parseJSON(const String &value)
 {
   StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
 
-  JsonObject &root = jsonBuffer.parseObject(payload);
+  JsonObject &root = jsonBuffer.parseObject(value);
 
 #ifdef DEBUG
   jsonFeedback("JSON " + payload);
@@ -75,16 +117,11 @@ bool H801Node::parseJsonCommand(const String &payload)
   }
   else if (root.containsKey("hsv"))
   {
-    struct CHSV hsvIn;
-    struct CRGB rgbOut;
-    hsvIn.hue = root["hsv"]["h"];
-    hsvIn.sat = root["hsv"]["s"];
-    hsvIn.val = root["hsv"]["v"];
-    hsv2rgb_rainbow(hsvIn, rgbOut);
-    _endValue[COLORINDEX::RED] = toPercent(rgbOut.red);
-    _endValue[COLORINDEX::GREEN] = toPercent(rgbOut.green);
-    _endValue[COLORINDEX::BLUE] = toPercent(rgbOut.blue);
-    _animationMode = STARTFADE;
+    int h, s, v;
+    h = root["hsv"]["h"];
+    s = root["hsv"]["s"];
+    v = root["hsv"]["v"];
+    fadeToHSV(h, s, v);
   }
 
   if (root.containsKey("speed"))
@@ -95,28 +132,52 @@ bool H801Node::parseJsonCommand(const String &payload)
   return true;
 }
 
-int H801Node::toPercent(const int value)
+bool H801Node::parseHSV(const String &value)
 {
-  Homie.getLogger() << value << endl;
-  return value * 100 / 255;
+  // Expects H,S,V as comma separated values
+  int h, s, v;
+
+  if (sscanf(value.c_str(), "%d,%d,%d", &h, &s, &v) == 3)
+  {
+    fadeToHSV(h, s, v);
+    return true;
+  }
+  return false;
 }
 
-int H801Node::tryStrToInt(const String &value, const int maxvalue)
+bool H801Node::parseRGB(const String &value)
 {
-  return constrain(value.toInt(), 0, maxvalue);
+  // Expects R,G,B as comma separated values
+  int r, g, b;
+
+  if (sscanf(value.c_str(), "%d,%d,%d", &r, &g, &b) == 3)
+  {
+    _endValue[COLORINDEX::RED] = r;
+    _endValue[COLORINDEX::GREEN] = g;
+    _endValue[COLORINDEX::BLUE] = b;
+    _animationMode = STARTFADE;
+    return true;
+  }
+  return false;
 }
 
 bool H801Node::handleInput(const String &property, const HomieRange &range, const String &value)
 {
   if (property == "command")
   {
-    if (parseJsonCommand(value))
-    {
-    }
+    parseJSON(value);
   }
   else if (property == "speed")
   {
     _transitionTime = tryStrToInt(value) * 1000 / cFadeSteps;
+  }
+  else if (property == "hsv")
+  {
+    parseHSV(value);
+  }
+  else if (property == "rgb")
+  {
+    parseRGB(value);
   }
   else if (property == "red")
   {
@@ -194,21 +255,18 @@ void H801Node::loop()
 void H801Node::beforeSetup()
 {
   advertise("command").settable(); // Parses a complete JSON command, so that every property can be set in one MQTT message
+  advertise("hsv").settable();     // Expects H,S,V as comma separated values (H=0°..360°, S,V=0%..100%)
+  advertise("rgb").settable();     // Expects R,G,B as comma separated values (R,G,B=0%..100%)
   advertise("speed").settable();   // Transition speed for colors and effects
-  advertise("red").settable();     // RGB values from 0% to 100%
-  advertise("green").settable();   //
-  advertise("blue").settable();    //
+  // advertise("red").settable();     // RGB values from 0% to 100%
+  // advertise("green").settable();   //
+  // advertise("blue").settable();    //
   // advertise("hue").settable();        // hue from 0° to 360°
   // advertise("saturation").settable(); // from 0% to 100%
   // advertise("value").settable();      // from 0% to 100%
   advertise("white1").settable(); // White channels from 0% to 100%
   advertise("white2").settable(); //
   // advertise("effect").settable();     //
-}
-
-void H801Node::setupHandler()
-{
-  //  setProperty(cVoltageUnit).send("V");
 }
 
 void H801Node::setup()

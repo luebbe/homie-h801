@@ -66,11 +66,19 @@ private:
 
   void printCaption();
 
-  int toPercent(const int value);
+  // Helper functions for conversion between different normalizations
+  // Standard = Byte to Percent and vice versa
+  int toByte(const int value, const int factor = 100);
+  int toPercent(const int value, const int factor = 100);
+
   int tryStrToInt(const String &value, const int maxvalue = 100);
 
+  void fadeToHSV(int h, int s, int v);
+
   void jsonFeedback(const String &message);
-  bool parseJsonCommand(const String &payload);
+  bool parseJSON(const String &value);
+  bool parseHSV(const String &value);
+  bool parseRGB(const String &value);
 
   // Methods for calculating the fade steps and the fading itself
   int calculateStep(int curValue, int endValue);
@@ -89,5 +97,4 @@ public:
   H801Node(const char *name);
 
   void beforeSetup();
-  void setupHandler();
 };
