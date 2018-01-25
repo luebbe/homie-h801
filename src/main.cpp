@@ -2,7 +2,6 @@
 #define FW_VERSION "1.0.0"
 
 #include <Homie.h>
-// #include <ArduinoOTA.h>
 #include "ota.hpp"
 #include "welcome.cpp"
 #include "H801Node.hpp"
@@ -15,14 +14,11 @@ H801Node h801node("h801");
 void setupHandler()
 {
   ota.setup();
-//  ArduinoOTA.setHostname(Homie.getConfiguration().deviceId);
-//  ArduinoOTA.begin();
 }
 
 void loopHandler()
 {
   ota.loop();
-//  ArduinoOTA.handle();
 }
 
 void setup()
@@ -33,6 +29,11 @@ void setup()
   // The H801 controller uses serial1 for output
   Serial1.begin(SERIAL_SPEED);
   Homie.setLoggingPrinter(&Serial1);
+
+  // The green LED on H801 is connected to Serial
+  Homie.setLedPin(LED_PIN_RED, LOW);
+
+  Homie.disableResetTrigger();
 
   welcome.show();
 
