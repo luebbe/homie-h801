@@ -37,6 +37,12 @@ private:
 
   enum ANIMATIONMODE
   {
+    FADEONCE = 0, // fade to target color and stop
+    CYCLE         // cycle through the color wheel continuously
+  };
+
+  enum ANIMATIONSTATE
+  {
     DONE = 0, // fading finished, nothing to do
     STARTFADE,
     DOFADE
@@ -52,17 +58,20 @@ private:
   };
 
   uint8_t _pins[5] = {DIMMER_1_PIN_RED, DIMMER_2_PIN_GREEN, DIMMER_3_PIN_BLUE, DIMMER_4_PIN_W1, DIMMER_5_PIN_W2};
-  uint8_t _curValue[5] = {0, 0, 0, 0, 0}; // The current percent value of the dimmer
-  uint8_t _endValue[5] = {0, 0, 0, 0, 0}; // The target percent value of the dimmer
-  int8_t _step[5] = {0, 0, 0, 0, 0};      // every _step milliseconds the corresponding dimmer value is incremented or decremented
-  const char *_jsonKey[5] = {"r", "g", "b", "w1", "w2"};
+  uint8_t _curValue[5] = {0, 0, 0, 0, 0};                // The current percent value of the dimmer
+  uint8_t _endValue[5] = {0, 0, 0, 0, 0};                // The target percent value of the dimmer
+  int8_t _step[5] = {0, 0, 0, 0, 0};                     // Every _step milliseconds the corresponding dimmer value is incremented or decremented
+  const char *_jsonKey[5] = {"r", "g", "b", "w1", "w2"}; // Lookup table to match the color values from json to array
+
+  struct CHSV _curHsv; // The current HSV values
 
   uint16_t _loopCount = 0;
 
   unsigned long _lastLoop = 0;
   unsigned long _transitionTime = 5 * 1000 / cFadeSteps; // one step each _transitionTime in milliseconds
 
-  ANIMATIONMODE _animationMode = DONE;
+  ANIMATIONMODE _animationMode = FADEONCE;
+  ANIMATIONSTATE _animationState = DONE;
 
   void printCaption();
 
@@ -73,7 +82,10 @@ private:
 
   int tryStrToInt(const String &value, const int maxvalue = 100);
 
-  void fadeToHSV(int h, int s, int v);
+  void fadeToHSVConvert(int h, int s, int v);
+
+  void fadeToHSV();
+  void fadeToRGB();
 
   void jsonFeedback(const String &message);
   bool parseJSON(const String &value);
@@ -87,6 +99,9 @@ private:
   void crossFade();
 
   void setColor();
+
+  void loopCycle();
+  void loopFade();
 
 protected:
   virtual bool handleInput(const String &property, const HomieRange &range, const String &value) override;

@@ -47,7 +47,7 @@ int H801Node::tryStrToInt(const String &value, const int maxvalue)
   return constrain(value.toInt(), 0, maxvalue);
 }
 
-void H801Node::fadeToHSV(int h, int s, int v)
+void H801Node::fadeToHSVConvert(int h, int s, int v)
 {
   // The FastLED hsv<->rgb converter works with values from 0..255
   // Input values from OpenHAB
@@ -56,22 +56,40 @@ void H801Node::fadeToHSV(int h, int s, int v)
   // V = 0%..100%
   // _endValue[s] are percent values again
 
-  struct CHSV hsvIn;
+  // Convert to byte value range
+  _curHsv.hue = toByte(h, 360);
+  _curHsv.sat = toByte(s);
+  _curHsv.val = toByte(v);
+
+  fadeToHSV();
+}
+
+void H801Node::fadeToHSV()
+{
   struct CRGB rgbOut;
 
-  // Convert to byte value range
-  hsvIn.hue = toByte(h, 360);
-  hsvIn.sat = toByte(s);
-  hsvIn.val = toByte(v);
-
   // do the math
-  hsv2rgb_rainbow(hsvIn, rgbOut);
+  hsv2rgb_rainbow(_curHsv, rgbOut);
 
   // convert back to percent values
   _endValue[COLORINDEX::RED] = toPercent(rgbOut.red);
   _endValue[COLORINDEX::GREEN] = toPercent(rgbOut.green);
   _endValue[COLORINDEX::BLUE] = toPercent(rgbOut.blue);
-  _animationMode = STARTFADE;
+  _animationState = STARTFADE;
+}
+
+void H801Node::fadeToRGB()
+{
+  struct CRGB rgbIn;
+  rgbIn.r = toByte(_endValue[COLORINDEX::RED]);
+  rgbIn.g = toByte(_endValue[COLORINDEX::GREEN]);
+  rgbIn.b = toByte(_endValue[COLORINDEX::BLUE]);
+
+  // Convert to HSV in order to have the current HSV value available for
+  // color cycling
+  _curHsv = rgb2hsv_approximate(rgbIn);
+
+  _animationState = STARTFADE;
 }
 
 void H801Node::jsonFeedback(const String &message)
@@ -113,7 +131,7 @@ bool H801Node::parseJSON(const String &value)
         _endValue[i] = tryStrToInt(color[_jsonKey[i]]);
       }
     }
-    _animationMode = STARTFADE;
+    fadeToRGB();
   }
   else if (root.containsKey("hsv"))
   {
@@ -121,7 +139,7 @@ bool H801Node::parseJSON(const String &value)
     h = root["hsv"]["h"];
     s = root["hsv"]["s"];
     v = root["hsv"]["v"];
-    fadeToHSV(h, s, v);
+    fadeToHSVConvert(h, s, v);
   }
 
   if (root.containsKey("speed"))
@@ -139,7 +157,7 @@ bool H801Node::parseHSV(const String &value)
 
   if (sscanf(value.c_str(), "%d,%d,%d", &h, &s, &v) == 3)
   {
-    fadeToHSV(h, s, v);
+    fadeToHSVConvert(h, s, v);
     return true;
   }
   return false;
@@ -155,7 +173,7 @@ bool H801Node::parseRGB(const String &value)
     _endValue[COLORINDEX::RED] = r;
     _endValue[COLORINDEX::GREEN] = g;
     _endValue[COLORINDEX::BLUE] = b;
-    _animationMode = STARTFADE;
+    fadeToRGB();
     return true;
   }
   return false;
@@ -167,9 +185,20 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
   {
     parseJSON(value);
   }
+  else if (property == "animation")
+  {
+    if (value == "fade")
+    {
+      _animationMode = FADEONCE;
+    }
+    else if (value == "cycle")
+    {
+      _animationMode = CYCLE;
+    }
+  }
   else if (property == "speed")
   {
-    _transitionTime = tryStrToInt(value) * 1000 / cFadeSteps;
+    _transitionTime = tryStrToInt(value);
   }
   else if (property == "hsv")
   {
@@ -182,27 +211,27 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
   else if (property == "red")
   {
     _endValue[COLORINDEX::RED] = tryStrToInt(value);
-    _animationMode = STARTFADE;
+    fadeToRGB();
   }
   else if (property == "green")
   {
     _endValue[COLORINDEX::GREEN] = tryStrToInt(value);
-    _animationMode = STARTFADE;
+    fadeToRGB();
   }
   else if (property == "blue")
   {
     _endValue[COLORINDEX::BLUE] = tryStrToInt(value);
-    _animationMode = STARTFADE;
+    fadeToRGB();
   }
   else if (property == "white1")
   {
     _endValue[COLORINDEX::WHITE1] = tryStrToInt(value);
-    _animationMode = STARTFADE;
+    _animationState = STARTFADE;
   }
   else if (property == "white2")
   {
     _endValue[COLORINDEX::WHITE2] = tryStrToInt(value);
-    _animationMode = STARTFADE;
+    _animationState = STARTFADE;
   }
 
   return true;
@@ -223,11 +252,38 @@ void H801Node::setColor()
 
 void H801Node::loop()
 {
-  if (_animationMode == STARTFADE)
+  switch (_animationMode)
   {
+  case CYCLE:
+    loopCycle();
+    break;
+  case FADEONCE:
+    loopFade();
+    break;
+  }
+}
+
+void H801Node::loopCycle()
+{
+  if (_animationState == DONE)
+  {
+    Homie.getLogger() << "CYCLE " << _curHsv.hue << endl;
+    _curHsv.hue = (_curHsv.hue + 1) % 255;
+    fadeToHSV();
+  };
+}
+
+void H801Node::loopFade()
+{
+  if (_animationState == STARTFADE)
+  {
+    Homie.getLogger() << "STARTFADE SPEED " << _transitionTime << endl;
+    // char feedback[20];
+    // sprintf(feedback, "%d,%d,%d", _endValue[COLORINDEX::RED], _endValue[COLORINDEX::GREEN], _endValue[COLORINDEX::BLUE]);
+    // setProperty("rgb").send(feedback);
     calculateSteps();
     _loopCount = 0;
-    _animationMode = DOFADE;
+    _animationState = DOFADE;
   };
 
   if (_transitionTime == 0)
@@ -236,14 +292,15 @@ void H801Node::loop()
     {
       _curValue[i] = _endValue[i];
       setColor();
+      _animationState = DONE;
     }
   }
   else
   {
-    if (_animationMode == DOFADE)
+    if (_animationState == DOFADE)
     {
       unsigned long now = millis();
-      if (now - _lastLoop > _transitionTime || _lastLoop == 0)
+      if ((now - _lastLoop > _transitionTime) || (_lastLoop == 0))
       {
         _lastLoop = now;
         crossFade();
@@ -254,10 +311,11 @@ void H801Node::loop()
 
 void H801Node::beforeSetup()
 {
-  advertise("command").settable(); // Parses a complete JSON command, so that every property can be set in one MQTT message
-  advertise("hsv").settable();     // Expects H,S,V as comma separated values (H=0°..360°, S,V=0%..100%)
-  advertise("rgb").settable();     // Expects R,G,B as comma separated values (R,G,B=0%..100%)
-  advertise("speed").settable();   // Transition speed for colors and effects
+  advertise("command").settable();   // Parses a complete JSON command, so that every property can be set in one MQTT message
+  advertise("animation").settable(); // Animation mode (fade|cycle)
+  advertise("speed").settable();     // Transition speed for colors and effects
+  advertise("hsv").settable();       // Expects H,S,V as comma separated values (H=0°..360°, S,V=0%..100%)
+  advertise("rgb").settable();       // Expects R,G,B as comma separated values (R,G,B=0%..100%)
   // advertise("red").settable();     // RGB values from 0% to 100%
   // advertise("green").settable();   //
   // advertise("blue").settable();    //
@@ -377,7 +435,7 @@ void H801Node::crossFade()
   }
   else
   {
-    _animationMode = DONE;
+    _animationState = DONE;
 #ifdef DEBUG
     Homie.getLogger() << "DONE" << endl;
 #endif
