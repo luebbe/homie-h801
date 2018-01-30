@@ -39,7 +39,8 @@ private:
 
   enum ANIMATIONMODE
   {
-    FADEONCE = 0, // fade to target color and stop
+    FADEOFF = 0,
+    FADEONCE, // fade to target color and stop
     FASTCYCLE,    // cycle through the color wheel continuously
     SLOWCYCLE
   };

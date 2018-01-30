@@ -69,6 +69,7 @@ void H801Node::fadeToHSV()
   _endValue[COLORINDEX::RED] = toPercent(rgbOut.red);
   _endValue[COLORINDEX::GREEN] = toPercent(rgbOut.green);
   _endValue[COLORINDEX::BLUE] = toPercent(rgbOut.blue);
+
   _animationState = STARTFADE;
 }
 
@@ -119,6 +120,14 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
 {
   if (property == "animation")
   {
+    if (value == "off")
+    {
+      _animationMode = FADEOFF;
+      _endValue[COLORINDEX::RED] = 0;
+      _endValue[COLORINDEX::GREEN] = 0;
+      _endValue[COLORINDEX::BLUE] = 0;
+      fadeToRGB();
+    }
     if (value == "fade")
     {
       _animationMode = FADEONCE;
@@ -190,6 +199,7 @@ void H801Node::loop()
 {
   switch (_animationMode)
   {
+  case FADEOFF:
   case FADEONCE:
     _waitTime = _transitionTime / cFadeSteps;
     loopFade();
