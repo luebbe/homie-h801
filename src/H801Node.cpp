@@ -191,12 +191,15 @@ void H801Node::loop()
   switch (_animationMode)
   {
   case FADEONCE:
+    _waitTime = _transitionTime / cFadeSteps;
     loopFade();
     break;
   case FASTCYCLE:
+    _waitTime = _transitionTime / cFastCycleSteps;
     loopCycle();
     break;
   case SLOWCYCLE:
+    _waitTime = _transitionTime / cSlowCycleSteps;
     loopCycle();
     break;
   }
@@ -204,19 +207,25 @@ void H801Node::loop()
 
 void H801Node::loopCycle()
 {
-  if (_animationState == DONE)
+  unsigned long now = millis();
+  // one step each _transitionTime in milliseconds
+  if ((now - _lastLoop > _waitTime) || (_lastLoop == 0))
   {
-    Homie.getLogger() << "CYCLE " << _curHsv.hue << endl;
+    _lastLoop = now;
     _curHsv.hue = (_curHsv.hue + 1) % 255;
     fadeToHSV();
-  };
+    for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+    {
+      _curValue[i] = _endValue[i];
+    }
+    setColor();
+  }
 }
 
 void H801Node::loopFade()
 {
   if (_animationState == STARTFADE)
   {
-    Homie.getLogger() << "STARTFADE SPEED " << _transitionTime << endl;
     // char feedback[20];
     // sprintf(feedback, "%d,%d,%d", _endValue[COLORINDEX::RED], _endValue[COLORINDEX::GREEN], _endValue[COLORINDEX::BLUE]);
     // setProperty("rgb").send(feedback);
@@ -227,7 +236,7 @@ void H801Node::loopFade()
 
   if (_transitionTime == 0)
   {
-    for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+    for (int i = COLORINDEX::RED; i <= COLORINDEX::BLUE; i++)
     {
       _curValue[i] = _endValue[i];
       setColor();
@@ -239,7 +248,8 @@ void H801Node::loopFade()
     if (_animationState == DOFADE)
     {
       unsigned long now = millis();
-      if ((now - _lastLoop > _transitionTime) || (_lastLoop == 0))
+      // one step each _transitionTime in milliseconds
+      if ((now - _lastLoop > _waitTime) || (_lastLoop == 0))
       {
         _lastLoop = now;
         crossFade();

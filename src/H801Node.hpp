@@ -27,15 +27,20 @@
 class H801Node : public HomieNode
 {
 private:
-  const int cFadeSteps = 400;
   const char *cCaption = "• H801 RGBWW Controller:";
+
+  // Cycles for different animations. The milliseconds per step are calculated from _transitionTime
+  const int cFadeSteps = 4 * 100; // Number of steps needed for a proper crossfade.
+  const int cFastCycleSteps = 100;
+  const int cSlowCycleSteps = cFastCycleSteps / 20;
+  const int cStartTransitionTime = 5000;
 
   static const uint16_t /*PROGMEM*/ gamma8[];
 
   enum ANIMATIONMODE
   {
     FADEONCE = 0, // fade to target color and stop
-    FASTCYCLE,  // cycle through the color wheel continuously
+    FASTCYCLE,    // cycle through the color wheel continuously
     SLOWCYCLE
   };
 
@@ -56,19 +61,20 @@ private:
   };
 
   uint8_t _pins[5] = {DIMMER_1_PIN_RED, DIMMER_2_PIN_GREEN, DIMMER_3_PIN_BLUE, DIMMER_4_PIN_W1, DIMMER_5_PIN_W2};
-  uint8_t _curValue[5] = {0, 0, 0, 0, 0};                // The current percent value of the dimmer
-  uint8_t _endValue[5] = {0, 0, 0, 0, 0};                // The target percent value of the dimmer
-  int8_t _step[5] = {0, 0, 0, 0, 0};                     // Every _step milliseconds the corresponding dimmer value is incremented or decremented
+  uint8_t _curValue[5] = {0, 0, 0, 0, 0}; // The current percent value of the dimmer
+  uint8_t _endValue[5] = {0, 0, 0, 0, 0}; // The target percent value of the dimmer
+  int8_t _step[5] = {0, 0, 0, 0, 0};      // Every _step milliseconds the corresponding dimmer value is incremented or decremented
 
   struct CHSV _curHsv; // The current HSV values
 
   uint16_t _loopCount = 0;
 
-  unsigned long _lastLoop = 0;
-  unsigned long _transitionTime = 5 * 1000 / cFadeSteps; // one step each _transitionTime in milliseconds
-
   ANIMATIONMODE _animationMode = FADEONCE;
   ANIMATIONSTATE _animationState = DONE;
+
+  unsigned long _lastLoop = 0;
+  unsigned long _transitionTime = cStartTransitionTime;
+  unsigned long _waitTime = cStartTransitionTime / cFadeSteps;
 
   void printCaption();
 
