@@ -40,8 +40,8 @@ private:
   enum ANIMATIONMODE
   {
     FADEOFF = 0,
-    FADEONCE, // fade to target color and stop
-    FASTCYCLE,    // cycle through the color wheel continuously
+    FADEONCE,  // fade to target color and stop
+    FASTCYCLE, // cycle through the color wheel continuously
     SLOWCYCLE
   };
 
@@ -66,7 +66,7 @@ private:
   uint8_t _endValue[5] = {0, 0, 0, 0, 0}; // The target percent value of the dimmer
   int8_t _step[5] = {0, 0, 0, 0, 0};      // Every _step milliseconds the corresponding dimmer value is incremented or decremented
 
-  struct CHSV _curHsv; // The current HSV values
+  struct CHSV _curHsv;  // The current HSV values
 
   uint16_t _loopCount = 0;
 
@@ -88,7 +88,7 @@ private:
 
   void fadeToHSVConvert(int h, int s, int v);
 
-  void fadeToHSV();
+  void fadeToHSV(CHSV hsvIn);
   void fadeToRGB();
 
   bool parseHSV(const String &value);

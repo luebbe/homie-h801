@@ -55,15 +55,15 @@ void H801Node::fadeToHSVConvert(int h, int s, int v)
   _curHsv.sat = toByte(s);
   _curHsv.val = toByte(v);
 
-  fadeToHSV();
+  fadeToHSV(_curHsv);
 }
 
-void H801Node::fadeToHSV()
+void H801Node::fadeToHSV(CHSV hsvIn)
 {
   struct CRGB rgbOut;
 
   // do the math
-  hsv2rgb_rainbow(_curHsv, rgbOut);
+  hsv2rgb_rainbow(hsvIn, rgbOut);
 
   // convert back to percent values
   _endValue[COLORINDEX::RED] = toPercent(rgbOut.red);
@@ -120,13 +120,15 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
 {
   if (property == "animation")
   {
+    if (_animationMode == FADEOFF)
+    {
+      fadeToHSV(_curHsv); // Fade to the last known HSV value
+    }
     if (value == "off")
     {
       _animationMode = FADEOFF;
-      _endValue[COLORINDEX::RED] = 0;
-      _endValue[COLORINDEX::GREEN] = 0;
-      _endValue[COLORINDEX::BLUE] = 0;
-      fadeToRGB();
+      CHSV hsv(0, 0, 0);
+      fadeToHSV(hsv);
     }
     if (value == "fade")
     {
@@ -223,7 +225,7 @@ void H801Node::loopCycle()
   {
     _lastLoop = now;
     _curHsv.hue = (_curHsv.hue + 1) % 255;
-    fadeToHSV();
+    fadeToHSV(_curHsv);
     for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
     {
       _curValue[i] = _endValue[i];
