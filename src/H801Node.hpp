@@ -10,7 +10,6 @@
 #pragma once
 
 #include <Homie.hpp>
-#include <ArduinoJson.h>
 #include "hsv2rgb.h"
 
 // #define DEBUG     // uncomment this line if you want to see the start and end values in fading
@@ -25,8 +24,6 @@
 #define LED_PIN_GREEN 1
 #define LED_PIN_RED 5
 
-const int BUFFER_SIZE = JSON_OBJECT_SIZE(15);
-
 class H801Node : public HomieNode
 {
 private:
@@ -38,7 +35,8 @@ private:
   enum ANIMATIONMODE
   {
     FADEONCE = 0, // fade to target color and stop
-    CYCLE         // cycle through the color wheel continuously
+    FASTCYCLE,  // cycle through the color wheel continuously
+    SLOWCYCLE
   };
 
   enum ANIMATIONSTATE
@@ -61,7 +59,6 @@ private:
   uint8_t _curValue[5] = {0, 0, 0, 0, 0};                // The current percent value of the dimmer
   uint8_t _endValue[5] = {0, 0, 0, 0, 0};                // The target percent value of the dimmer
   int8_t _step[5] = {0, 0, 0, 0, 0};                     // Every _step milliseconds the corresponding dimmer value is incremented or decremented
-  const char *_jsonKey[5] = {"r", "g", "b", "w1", "w2"}; // Lookup table to match the color values from json to array
 
   struct CHSV _curHsv; // The current HSV values
 
@@ -87,8 +84,6 @@ private:
   void fadeToHSV();
   void fadeToRGB();
 
-  void jsonFeedback(const String &message);
-  bool parseJSON(const String &value);
   bool parseHSV(const String &value);
   bool parseRGB(const String &value);
 

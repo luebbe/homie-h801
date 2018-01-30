@@ -25,13 +25,7 @@ const uint16_t /*PROGMEM*/ H801Node::gamma8[] = {
 H801Node::H801Node(const char *name)
     : HomieNode(name, "RGBWW Controller")
 {
-  for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
-  {
-    pinMode(_pins[i], OUTPUT);
-    analogWrite(_pins[i], 0);
-  }
 }
-
 int H801Node::toByte(const int value, const int factor)
 {
   return value * 255 / factor;
@@ -92,64 +86,6 @@ void H801Node::fadeToRGB()
   _animationState = STARTFADE;
 }
 
-void H801Node::jsonFeedback(const String &message)
-{
-  Homie.getLogger() << message << endl;
-  setProperty("message").send(message);
-}
-
-bool H801Node::parseJSON(const String &value)
-{
-  StaticJsonBuffer<BUFFER_SIZE> jsonBuffer;
-
-  JsonObject &root = jsonBuffer.parseObject(value);
-
-#ifdef DEBUG
-  jsonFeedback("JSON " + payload);
-#endif
-
-  if (!root.success())
-  {
-#ifdef DEBUG
-    jsonFeedback("JSON Parsing failed");
-#endif
-    return false;
-  }
-
-  if (root.containsKey("color") && root.containsKey("hsv"))
-  {
-    jsonFeedback("JSON command may only contain either 'color' or 'hsv'");
-  }
-  else if (root.containsKey("color"))
-  {
-    JsonObject &color = root["color"];
-
-    for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
-    {
-      if (color.containsKey(_jsonKey[i]))
-      {
-        _endValue[i] = tryStrToInt(color[_jsonKey[i]]);
-      }
-    }
-    fadeToRGB();
-  }
-  else if (root.containsKey("hsv"))
-  {
-    int h, s, v;
-    h = root["hsv"]["h"];
-    s = root["hsv"]["s"];
-    v = root["hsv"]["v"];
-    fadeToHSVConvert(h, s, v);
-  }
-
-  if (root.containsKey("speed"))
-  {
-    _transitionTime = root["speed"];
-  }
-
-  return true;
-}
-
 bool H801Node::parseHSV(const String &value)
 {
   // Expects H,S,V as comma separated values
@@ -181,19 +117,19 @@ bool H801Node::parseRGB(const String &value)
 
 bool H801Node::handleInput(const String &property, const HomieRange &range, const String &value)
 {
-  if (property == "command")
-  {
-    parseJSON(value);
-  }
-  else if (property == "animation")
+  if (property == "animation")
   {
     if (value == "fade")
     {
       _animationMode = FADEONCE;
     }
-    else if (value == "cycle")
+    else if (value == "fast")
     {
-      _animationMode = CYCLE;
+      _animationMode = FASTCYCLE;
+    }
+    else if (value == "slow")
+    {
+      _animationMode = SLOWCYCLE;
     }
   }
   else if (property == "speed")
@@ -254,11 +190,14 @@ void H801Node::loop()
 {
   switch (_animationMode)
   {
-  case CYCLE:
-    loopCycle();
-    break;
   case FADEONCE:
     loopFade();
+    break;
+  case FASTCYCLE:
+    loopCycle();
+    break;
+  case SLOWCYCLE:
+    loopCycle();
     break;
   }
 }
@@ -311,10 +250,14 @@ void H801Node::loopFade()
 
 void H801Node::beforeSetup()
 {
-  advertise("command").settable();   // Parses a complete JSON command, so that every property can be set in one MQTT message
+  for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+  {
+    pinMode(_pins[i], OUTPUT);
+    analogWrite(_pins[i], LOW);
+  }
   advertise("animation").settable(); // Animation mode (fade|cycle)
   advertise("speed").settable();     // Transition speed for colors and effects
-  advertise("hsv").settable();       // Expects H,S,V as comma separated values (H=0°..360°, S,V=0%..100%)
+  advertise("hsv").settable();       // Expects H,S,V as comma separated values (Hue=0°..360°, Sat=0%..100%, Val=0%..100%)
   advertise("rgb").settable();       // Expects R,G,B as comma separated values (R,G,B=0%..100%)
   // advertise("red").settable();     // RGB values from 0% to 100%
   // advertise("green").settable();   //
@@ -331,7 +274,6 @@ void H801Node::setup()
 {
   printCaption();
 }
-
 // From https://www.arduino.cc/en/Tutorial/ColorCrossfader
 //
 // Modified to work with percent values for each dimmer
