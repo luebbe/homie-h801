@@ -144,7 +144,7 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
     }
   }
 
-  else if (property == "speed")
+  else if (property == cPropSpeed)
   {
     _transitionTime = tryStrToInt(value);
   }
@@ -156,27 +156,27 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
   {
     parseRGB(value);
   }
-  else if (property == "red")
+  else if (property == cPropRed)
   {
     _endValue[COLORINDEX::RED] = tryStrToInt(value);
     fadeToRGB();
   }
-  else if (property == "green")
+  else if (property == cPropGreen)
   {
     _endValue[COLORINDEX::GREEN] = tryStrToInt(value);
     fadeToRGB();
   }
-  else if (property == "blue")
+  else if (property == cPropBlue)
   {
     _endValue[COLORINDEX::BLUE] = tryStrToInt(value);
     fadeToRGB();
   }
-  else if (property == "white1")
+  else if (property == cPropWhite1)
   {
     _endValue[COLORINDEX::WHITE1] = tryStrToInt(value);
     _effectState = esSTARTFADE;
   }
-  else if (property == "white2")
+  else if (property == cPropWhite2)
   {
     _endValue[COLORINDEX::WHITE2] = tryStrToInt(value);
     _effectState = esSTARTFADE;
@@ -249,7 +249,7 @@ void H801Node::setEffectMode(EFFECTMODE mode)
 void H801Node::setRGBState()
 {
   char rgbState[20];
-  sprintf(rgbState, "%d,%d,%d", _curValue[COLORINDEX::RED], _curValue[COLORINDEX::GREEN], _curValue[COLORINDEX::BLUE]);
+  sprintf(rgbState, "%d,%d,%d", _endValue[COLORINDEX::RED], _endValue[COLORINDEX::GREEN], _endValue[COLORINDEX::BLUE]);
   setProperty(cPropRGB).send(rgbState);
 #ifdef DEBUG
   Homie.getLogger() << "Done RGB=" << rgbState << endl;
@@ -329,17 +329,17 @@ void H801Node::beforeSetup()
   }
   advertise(cPropOn).settable();         // on/off = true/false
   advertise(cPropEffectMode).settable(); // Effect mode (none|fade|cycle)
-  advertise("speed").settable();         // Transition speed for colors and effects
+  advertise(cPropSpeed).settable();         // Transition speed for colors and effects
   advertise(cPropHSV).settable();        // Expects H,S,V as comma separated values (Hue=0°..360°, Sat=0%..100%, Val=0%..100%)
   advertise(cPropRGB).settable();        // Expects R,G,B as comma separated values (R,G,B=0%..100%)
-  // advertise("red").settable();     // RGB values from 0% to 100%
-  // advertise("green").settable();   //
-  // advertise("blue").settable();    //
+  // advertise(cPropRed).settable();     // RGB values from 0% to 100%
+  // advertise(cPropGreen).settable();   //
+  // advertise(cPropBlue).settable();    //
   // advertise("hue").settable();        // hue from 0° to 360°
   // advertise("saturation").settable(); // from 0% to 100%
   // advertise("value").settable();      // from 0% to 100%
-  advertise("white1").settable(); // White channels from 0% to 100%
-  advertise("white2").settable(); //
+  advertise(cPropWhite1).settable(); // White channels from 0% to 100%
+  advertise(cPropWhite2).settable(); //
 }
 
 void H801Node::setup()

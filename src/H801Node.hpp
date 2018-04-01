@@ -34,7 +34,12 @@ private:
   const char *cPropEffectMode = "effect";
   const char *cPropRGB = "rgb";
   const char *cPropHSV = "hsv";
-
+  const char *cPropSpeed = "speed";
+  const char *cPropRed = "red";
+  const char *cPropGreen = "green";
+  const char *cPropBlue = "blue";
+  const char *cPropWhite1 = "white1";
+  const char *cPropWhite2 = "white2";
   // Cycles for different animations. The milliseconds per step are calculated from _transitionTime
   const int cFadeSteps = 4 * 100; // Number of steps needed for a proper crossfade.
   const int cFastCycleSteps = 100;
