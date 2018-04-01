@@ -12,7 +12,7 @@
 #include <Homie.hpp>
 #include "hsv2rgb.h"
 
-// #define DEBUG     // uncomment this line if you want to see the start and end values in fading
+// #define DEBUG // uncomment this line if you want to see the start and end values in fading
 // #define DEBUGFADE // uncomment this line if you want to see all the single steps in fading
 
 #define DIMMER_1_PIN_RED 15
@@ -29,6 +29,12 @@ class H801Node : public HomieNode
 private:
   const char *cCaption = "• H801 RGBWW Controller:";
 
+  // Settable properties
+  const char *cPropOn = "on"; // Not really settable, always reports true, because the controller is connected to a physical switch
+  const char *cPropEffectMode = "effect";
+  const char *cPropRGB = "rgb";
+  const char *cPropHSV = "hsv";
+
   // Cycles for different animations. The milliseconds per step are calculated from _transitionTime
   const int cFadeSteps = 4 * 100; // Number of steps needed for a proper crossfade.
   const int cFastCycleSteps = 100;
@@ -37,19 +43,19 @@ private:
 
   static const uint16_t /*PROGMEM*/ gamma8[];
 
-  enum ANIMATIONMODE
+  enum EFFECTMODE
   {
-    FADEOFF = 0,
-    FADEONCE,  // fade to target color and stop
-    FASTCYCLE, // cycle through the color wheel continuously
-    SLOWCYCLE
+    emNONE = 0,  // set color immediately
+    emFADE,      // fade to target color and stop
+    emFASTCYCLE, // cycle through the color wheel continuously
+    emSLOWCYCLE
   };
 
-  enum ANIMATIONSTATE
+  enum EFFECTSTATE
   {
-    DONE = 0, // fading finished, nothing to do
-    STARTFADE,
-    DOFADE
+    esDONE = 0, // fading finished, nothing to do
+    esSTARTFADE,
+    esDOFADE
   };
 
   enum COLORINDEX // Enum for array indices
@@ -66,12 +72,12 @@ private:
   uint8_t _endValue[5] = {0, 0, 0, 0, 0}; // The target percent value of the dimmer
   int8_t _step[5] = {0, 0, 0, 0, 0};      // Every _step milliseconds the corresponding dimmer value is incremented or decremented
 
-  struct CHSV _curHsv;  // The current HSV values
+  struct CHSV _curHsv; // The current HSV values
 
   uint16_t _loopCount = 0;
 
-  ANIMATIONMODE _animationMode = FADEONCE;
-  ANIMATIONSTATE _animationState = DONE;
+  EFFECTMODE _effectMode = emFADE;
+  EFFECTSTATE _effectState = esDONE;
 
   unsigned long _lastLoop = 0;
   unsigned long _transitionTime = cStartTransitionTime;
@@ -101,6 +107,10 @@ private:
   void crossFade();
 
   void setColor();
+  void setEndColor(bool done);
+
+  void setEffectMode(EFFECTMODE mode);
+  void setRGBState();
 
   void loopCycle();
   void loopFade();

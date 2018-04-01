@@ -70,7 +70,7 @@ void H801Node::fadeToHSV(CHSV hsvIn)
   _endValue[COLORINDEX::GREEN] = toPercent(rgbOut.green);
   _endValue[COLORINDEX::BLUE] = toPercent(rgbOut.blue);
 
-  _animationState = STARTFADE;
+  _effectState = esSTARTFADE;
 }
 
 void H801Node::fadeToRGB()
@@ -84,7 +84,7 @@ void H801Node::fadeToRGB()
   // color cycling
   _curHsv = rgb2hsv_approximate(rgbIn);
 
-  _animationState = STARTFADE;
+  _effectState = esSTARTFADE;
 }
 
 bool H801Node::parseHSV(const String &value)
@@ -118,40 +118,41 @@ bool H801Node::parseRGB(const String &value)
 
 bool H801Node::handleInput(const String &property, const HomieRange &range, const String &value)
 {
-  if (property == "animation")
+  if (property == cPropOn)
   {
-    if (_animationMode == FADEOFF)
+    // Not really settable, always reports true, because the controller is connected to a physical switch
+    setProperty(cPropOn).send("true");
+  }
+
+  else if (property == cPropEffectMode)
+  {
+    if (value == "none")
     {
-      fadeToHSV(_curHsv); // Fade to the last known HSV value
+      setEffectMode(emNONE);
     }
-    if (value == "off")
+    else if (value == "fade")
     {
-      _animationMode = FADEOFF;
-      CHSV hsv(0, 0, 0);
-      fadeToHSV(hsv);
-    }
-    if (value == "fade")
-    {
-      _animationMode = FADEONCE;
+      setEffectMode(emFADE);
     }
     else if (value == "fast")
     {
-      _animationMode = FASTCYCLE;
+      setEffectMode(emFASTCYCLE);
     }
     else if (value == "slow")
     {
-      _animationMode = SLOWCYCLE;
+      setEffectMode(emSLOWCYCLE);
     }
   }
+
   else if (property == "speed")
   {
     _transitionTime = tryStrToInt(value);
   }
-  else if (property == "hsv")
+  else if (property == cPropHSV)
   {
     parseHSV(value);
   }
-  else if (property == "rgb")
+  else if (property == cPropRGB)
   {
     parseRGB(value);
   }
@@ -173,12 +174,12 @@ bool H801Node::handleInput(const String &property, const HomieRange &range, cons
   else if (property == "white1")
   {
     _endValue[COLORINDEX::WHITE1] = tryStrToInt(value);
-    _animationState = STARTFADE;
+    _effectState = esSTARTFADE;
   }
   else if (property == "white2")
   {
     _endValue[COLORINDEX::WHITE2] = tryStrToInt(value);
-    _animationState = STARTFADE;
+    _effectState = esSTARTFADE;
   }
 
   return true;
@@ -197,23 +198,84 @@ void H801Node::setColor()
   }
 }
 
+void H801Node::setEndColor(bool done)
+{
+  for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+  {
+    _curValue[i] = _endValue[i];
+  }
+  setColor();
+
+  if (done)
+  {
+    setRGBState();
+    _effectState = esDONE;
+  }
+}
+
+void H801Node::setEffectMode(EFFECTMODE mode)
+{
+#ifdef DEBUG
+  Homie.getLogger() << "MODE " << _effectMode << "->" << mode << endl;
+#endif
+  switch (mode)
+  {
+  case emNONE:
+    _effectMode = emNONE;
+    // _waitTime = 0;
+    setProperty(cPropEffectMode).send("none");
+    break;
+  case emFADE:
+    _effectMode = emFADE;
+    _waitTime = _transitionTime / cFadeSteps;
+    setProperty(cPropEffectMode).send("fade");
+    setRGBState();
+    break;
+  case emFASTCYCLE:
+    _effectMode = emFASTCYCLE;
+    _effectState = esDOFADE;
+    _waitTime = _transitionTime / cFastCycleSteps;
+    setProperty(cPropEffectMode).send("fast");
+    break;
+  case emSLOWCYCLE:
+    _waitTime = _transitionTime / cSlowCycleSteps;
+    _effectMode = emSLOWCYCLE;
+    _effectState = esDOFADE;
+    setProperty(cPropEffectMode).send("slow");
+    break;
+  }
+}
+
+void H801Node::setRGBState()
+{
+  char rgbState[20];
+  sprintf(rgbState, "%d,%d,%d", _curValue[COLORINDEX::RED], _curValue[COLORINDEX::GREEN], _curValue[COLORINDEX::BLUE]);
+  setProperty(cPropRGB).send(rgbState);
+#ifdef DEBUG
+  Homie.getLogger() << "Done RGB=" << rgbState << endl;
+#endif
+}
+
 void H801Node::loop()
 {
-  switch (_animationMode)
+  if (_effectState != esDONE)
   {
-  case FADEOFF:
-  case FADEONCE:
-    _waitTime = _transitionTime / cFadeSteps;
-    loopFade();
-    break;
-  case FASTCYCLE:
-    _waitTime = _transitionTime / cFastCycleSteps;
-    loopCycle();
-    break;
-  case SLOWCYCLE:
-    _waitTime = _transitionTime / cSlowCycleSteps;
-    loopCycle();
-    break;
+    switch (_effectMode)
+    {
+    // case emNONE:
+    //   Homie.getLogger() << "MODE = emNONE " << _effectState << endl;
+    //   setEndColor(true);
+    //   break;
+    case emFADE:
+      loopFade();
+      break;
+    case emFASTCYCLE:
+      loopCycle();
+      break;
+    case emSLOWCYCLE:
+      loopCycle();
+      break;
+    }
   }
 }
 
@@ -226,38 +288,26 @@ void H801Node::loopCycle()
     _lastLoop = now;
     _curHsv.hue = (_curHsv.hue + 1) % 255;
     fadeToHSV(_curHsv);
-    for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
-    {
-      _curValue[i] = _endValue[i];
-    }
-    setColor();
+    setEndColor(false);
   }
 }
 
 void H801Node::loopFade()
 {
-  if (_animationState == STARTFADE)
+  if (_effectState == esSTARTFADE)
   {
-    // char feedback[20];
-    // sprintf(feedback, "%d,%d,%d", _endValue[COLORINDEX::RED], _endValue[COLORINDEX::GREEN], _endValue[COLORINDEX::BLUE]);
-    // setProperty("rgb").send(feedback);
     calculateSteps();
     _loopCount = 0;
-    _animationState = DOFADE;
+    _effectState = esDOFADE;
   };
 
   if (_transitionTime == 0)
   {
-    for (int i = COLORINDEX::RED; i <= COLORINDEX::BLUE; i++)
-    {
-      _curValue[i] = _endValue[i];
-      setColor();
-      _animationState = DONE;
-    }
+    setEndColor(true);
   }
   else
   {
-    if (_animationState == DOFADE)
+    if (_effectState == esDOFADE)
     {
       unsigned long now = millis();
       // one step each _transitionTime in milliseconds
@@ -277,10 +327,11 @@ void H801Node::beforeSetup()
     pinMode(_pins[i], OUTPUT);
     analogWrite(_pins[i], LOW);
   }
-  advertise("animation").settable(); // Animation mode (fade|cycle)
-  advertise("speed").settable();     // Transition speed for colors and effects
-  advertise("hsv").settable();       // Expects H,S,V as comma separated values (Hue=0°..360°, Sat=0%..100%, Val=0%..100%)
-  advertise("rgb").settable();       // Expects R,G,B as comma separated values (R,G,B=0%..100%)
+  advertise(cPropOn).settable();         // on/off = true/false
+  advertise(cPropEffectMode).settable(); // Effect mode (none|fade|cycle)
+  advertise("speed").settable();         // Transition speed for colors and effects
+  advertise(cPropHSV).settable();        // Expects H,S,V as comma separated values (Hue=0°..360°, Sat=0%..100%, Val=0%..100%)
+  advertise(cPropRGB).settable();        // Expects R,G,B as comma separated values (R,G,B=0%..100%)
   // advertise("red").settable();     // RGB values from 0% to 100%
   // advertise("green").settable();   //
   // advertise("blue").settable();    //
@@ -289,7 +340,6 @@ void H801Node::beforeSetup()
   // advertise("value").settable();      // from 0% to 100%
   advertise("white1").settable(); // White channels from 0% to 100%
   advertise("white2").settable(); //
-  // advertise("effect").settable();     //
 }
 
 void H801Node::setup()
@@ -399,9 +449,7 @@ void H801Node::crossFade()
   }
   else
   {
-    _animationState = DONE;
-#ifdef DEBUG
-    Homie.getLogger() << "DONE" << endl;
-#endif
+    _effectState = esDONE;
+    setRGBState();
   }
 }
