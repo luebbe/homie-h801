@@ -325,8 +325,8 @@ void H801Node::beforeSetup()
   for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
   {
     pinMode(_pins[i], OUTPUT);
-    analogWrite(_pins[i], LOW);
   }
+  setColor();
   advertise(cPropOn).settable();         // on/off = true/false
   advertise(cPropEffectMode).settable(); // Effect mode (none|fade|cycle)
   advertise(cPropSpeed).settable();         // Transition speed for colors and effects
@@ -340,6 +340,14 @@ void H801Node::beforeSetup()
   // advertise("value").settable();      // from 0% to 100%
   advertise(cPropWhite1).settable(); // White channels from 0% to 100%
   advertise(cPropWhite2).settable(); //
+}
+
+void H801Node::blackout()
+{
+  for (int i = COLORINDEX::RED; i <= COLORINDEX::WHITE2; i++)
+  {
+    analogWrite(_pins[i], 0);
+  }
 }
 
 void H801Node::setup()

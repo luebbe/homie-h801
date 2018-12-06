@@ -73,9 +73,9 @@ private:
   };
 
   uint8_t _pins[5] = {DIMMER_1_PIN_RED, DIMMER_2_PIN_GREEN, DIMMER_3_PIN_BLUE, DIMMER_4_PIN_W1, DIMMER_5_PIN_W2};
-  uint8_t _curValue[5] = {0, 0, 0, 0, 0}; // The current percent value of the dimmer
-  uint8_t _endValue[5] = {0, 0, 0, 0, 0}; // The target percent value of the dimmer
-  int8_t _step[5] = {0, 0, 0, 0, 0};      // Every _step milliseconds the corresponding dimmer value is incremented or decremented
+  uint8_t _curValue[5] = {80, 62, 44, 50, 50}; // The current percent value of the dimmer. Also the power on values 
+  uint8_t _endValue[5] = {0, 0, 0, 0, 0};      // The target percent value of the dimmer
+  int8_t _step[5] = {0, 0, 0, 0, 0};           // Every _step milliseconds the corresponding dimmer value is incremented or decremented
 
   struct CHSV _curHsv; // The current HSV values
 
@@ -129,4 +129,5 @@ public:
   H801Node(const char *name);
 
   void beforeSetup();
+  void blackout();
 };

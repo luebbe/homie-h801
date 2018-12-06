@@ -1,15 +1,22 @@
 #define FW_NAME "homie-h801"
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.0.1"
 
 #include <Homie.h>
 #include "ota.hpp"
 #include "welcome.cpp"
 #include "H801Node.hpp"
 
-OtaLogger ota;
+void beforeOta();
+
+OtaLogger ota(beforeOta);
 Welcome welcome(FW_NAME, FW_VERSION);
 
 H801Node h801node("h801");
+
+void beforeOta()
+{
+  h801node.blackout();
+}
 
 void setupHandler()
 {
